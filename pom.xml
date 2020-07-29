@@ -30,6 +30,12 @@
 			<scope>runtime</scope>
 			<optional>true</optional>
 		</dependency>
+		<!-- opencv -->
+		<dependency>
+			<groupId>fakepath</groupId>
+			<artifactId>opencv</artifactId>
+			<version>430</version>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
