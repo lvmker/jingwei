@@ -55,7 +55,8 @@ public class JingweiMat {
 	}
 	/**
 	 * 图像灰度化（图像颜色空间转换）
-	 * @param code
+	 * @param code 默认为灰度
+	 * Imgproc.COLOR_BGR2HSV
 	 * @return
 	 * @throws BaseException
 	 */
@@ -118,6 +119,27 @@ public class JingweiMat {
 		Mat dst=MatProcessTools.morphologyExRect(mat, size, operate);
 		return new JingweiMat(dst,"morphologyExRect");
 	}
+	
+	/**
+	 * 图片裁剪
+	 * @param colsp
+	 * @param rowsp
+	 * @return
+	 * @throws BaseException
+	 */
+	public JingweiMat submat(double colsp,double rowsp) throws BaseException {
+		if(this.mat==null||mat.empty()) {
+			throw new BaseException(BaseException.ERROR_CODE.UNSUPPORTED_METHOD, "mat为空，无法进行图片裁剪");
+		}
+		if(0>=colsp||colsp>1||0>=rowsp||rowsp>1) {
+			throw new BaseException(BaseException.ERROR_CODE.UNSUPPORTED_METHOD, "colsp和rowsp为比例，必须在(0,1]范围之内");
+		}
+        int cols = mat.cols();
+        int rows = mat.rows();
+        Mat dst=mat.submat((int)((1-rowsp)*rows/2),(int) ((1+rowsp)*rows/2), (int)((1-colsp)*cols/2), (int)((1+colsp)*cols/2));
+		return new JingweiMat(dst,colsp+"submat"+rowsp);
+	}
+	
 	/**
 	 * 轮廓提取
 	 * @return
@@ -137,6 +159,8 @@ public class JingweiMat {
 		}
 		return rects;
 	}
+
+	
 	
 	
 }

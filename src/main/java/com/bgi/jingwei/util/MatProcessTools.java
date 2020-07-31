@@ -1,9 +1,12 @@
 package com.bgi.jingwei.util;
 
 
+import java.util.Random;
+
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.Point;
 import org.opencv.core.RotatedRect;
 import org.opencv.core.Size;
 import org.opencv.imgcodecs.Imgcodecs;
@@ -171,22 +174,206 @@ public class MatProcessTools {
 	 * @param mr
 	 * @return
 	 */
-	public static boolean isPlateRect(RotatedRect mr) {
-		boolean needAdjust=mr.size.width > mr.size.height;//图形需要调整
-		double r =needAdjust?(mr.size.width / mr.size.height):(mr.size.height / mr.size.width);//矩形宽高比,
+	public static Mat getPlateMat(Mat src,RotatedRect mr) {
+		boolean needAdjust=mr.size.height > mr.size.width;//图形需要调整
+		double r =needAdjust?(mr.size.height / mr.size.width):(mr.size.width / mr.size.height);//矩形宽高比,
 		double area=mr.size.height * mr.size.width;//矩形面积
 		double minArea=44 * 14 * 3;//可以识别的最小车牌面积
 		double aspect =3.75;//标准宽高比
 	    double rmin = aspect - 1;//
 	    double rmax = aspect + 1;//
 	    boolean isMatch=area >= minArea&&r >= rmin && r <= rmax;
-	    double angle = mr.angle;
-	    if(needAdjust) {
-	    	angle = 90 + angle;
+	    if(isMatch) {
+	    	System.out.println("图像面积："+area+"("+minArea+",-)"+",矩形宽高比："+r+"("+rmin+","+rmax+"),ismatch="+isMatch);
+		    double angle = mr.angle;
+		    Size rect_size = new Size((int) mr.size.width, (int) mr.size.height);
+		    if(needAdjust) {
+		    	angle = 90 + angle;
+		    	rect_size = new Size(rect_size.height, rect_size.width);
+		    }
+		    if (angle - 30 < 0 && angle + 30 > 0) {
+		    	System.out.println("height:"+rect_size.height+",width:"+rect_size.width+",angle:"+angle);
+                Mat img_rotated = new Mat();
+                Mat rotmat =Imgproc.getRotationMatrix2D(mr.center, angle, 1);
+                Imgproc.warpAffine(src, img_rotated, rotmat, src.size());//仿射变换 用户图像平移和旋转
+                Mat img_crop = new Mat();
+                Imgproc.getRectSubPix(src, rect_size, mr.center, img_crop);
+                Mat resultResized = new Mat();
+                resultResized.create(36, 136, CvType.CV_8UC3);
+                Imgproc.resize(img_crop, resultResized, resultResized.size(), 0, 0, 2);
+                return resultResized;
+		    }
 	    }
-	    
-		return isMatch;
+		return null;
 	}
-	
-	
+	/**
+	 * 判断是否文字
+	 * @param r
+	 * @return
+	 */
+    public static Boolean isCharMat(Mat r) {
+        float aspect = 45.0f / 90.0f;
+        float charAspect = (float) r.cols() / (float) r.rows();//宽高比
+        float error = 0.7f;
+        float minHeight = 10f;
+        float maxHeight = 35f;
+        // We have a different aspect ratio for number 1, and it can be ~0.2
+        float minAspect = 0.05f;
+        float maxAspect = aspect + aspect * error;
+        // area of pixels
+        float area = Core.countNonZero(r);//字体面积
+        // bb area
+        float bbArea = r.cols() * r.rows();//总面积
+        // % of pixel in area
+        float percPixels = area / bbArea;//字体面积占比
+        boolean isMatched=bbArea>=200f&&percPixels <= 1 && charAspect > minAspect && charAspect < maxAspect && r.rows() >= minHeight && r.rows() < maxHeight;
+//        System.out.println(j+"=="+isMatched+"==宽高比="+charAspect+",非字体面积="+area+",总面积="+bbArea+",percPixels="+percPixels);
+        return isMatched;
+    }
+    
+    /**
+     * 进行腐蚀操作
+     * @param inMat
+     * @return
+     */
+    public static Mat erode(Mat inMat) {
+        Mat result = inMat.clone();
+        Mat element = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(2, 2));
+        Imgproc.erode(inMat, result, element);
+        return result;
+    }
+
+    /**
+     * 进行膨胀操作
+     * @param inMat
+     * @return
+     */
+    public static Mat dilate(Mat inMat) {
+        Mat result = inMat.clone();
+        Mat element = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(2, 2));
+        Imgproc.dilate(inMat, result, element);
+        return result;
+    }
+    /**
+     * 随机数平移
+     * @param inMat
+     * @return
+     */
+    public static Mat randTranslate(Mat inMat) {
+        Random rand = new Random();
+        Mat result = inMat.clone();
+        int ran_x = rand.nextInt(10000) % 5 - 2; // 控制在-2~3个像素范围内
+        int ran_y = rand.nextInt(10000) % 5 - 2;
+        return translateImg(result, ran_x, ran_y);
+    }
+    /**
+     * 随机数旋转
+     * @param inMat
+     * @return
+     */
+    public static Mat randRotate(Mat inMat) {
+        Random rand = new Random();
+        Mat result = inMat.clone();
+        float angle = (float) (rand.nextInt(10000) % 15 - 7); // 旋转角度控制在-7~8°范围内
+        return rotateImg(result, angle);
+    }
+
+
+    /**
+     * 平移
+     * @param img
+     * @param offsetx
+     * @param offsety
+     * @return
+     */
+    public static Mat translateImg(Mat img, int offsetx, int offsety){
+        Mat dst = new Mat();
+        //定义平移矩阵
+        Mat trans_mat = Mat.zeros(2, 3, CvType.CV_32FC1);
+        trans_mat.put(0, 0, 1);
+        trans_mat.put(0, 2, offsetx);
+        trans_mat.put(1, 1, 1);
+        trans_mat.put(1, 2, offsety);
+        Imgproc.warpAffine(img, dst, trans_mat, img.size());    // 仿射变换
+        return dst;
+    }
+    
+    /**
+     * 旋转角度
+     * @param source
+     * @param angle
+     * @return
+     */
+    public static Mat rotateImg(Mat source, float angle){
+        Point src_center = new Point(source.cols() / 2.0F, source.rows() / 2.0F);
+        Mat rot_mat = Imgproc.getRotationMatrix2D(src_center, angle, 1);
+        Mat dst = new Mat();
+        // 仿射变换 可以考虑使用投影变换; 这里使用放射变换进行旋转，对于实际效果来说感觉意义不大，反而会干扰结果预测
+        Imgproc.warpAffine(source, dst, rot_mat, source.size());    
+        return dst;
+    }
+    /**
+     * 
+     * @param in
+     * @param sizeData
+     * @return
+     */
+    public static Mat features(Mat in, int sizeData) {
+        float[] vhist = projectedHistogram(in, false);
+        float[] hhist = projectedHistogram(in, true);
+        Mat lowData = new Mat();
+        if (sizeData > 0) {
+            Imgproc.resize(in, lowData, new Size(sizeData, sizeData));//调整图像大小
+        }
+        int numCols = vhist.length + hhist.length + lowData.cols() * lowData.rows();
+        Mat out = new Mat(1, numCols, CvType.CV_32F);
+        int j = 0;
+        for (int i = 0; i < vhist.length; ++i, ++j) {
+            out.put(0, j, vhist[i]);
+        }
+        for (int i = 0; i < hhist.length; ++i, ++j) {
+            out.put(0, j, hhist[i]);
+        }
+        for (int x = 0; x < lowData.cols(); x++) {
+            for (int y = 0; y < lowData.rows(); y++, ++j) {
+                double[] val = lowData.get(x, y);
+                out.put(0, j, val[0]);
+            }
+        }
+        return out;
+    }
+    /**
+     * 
+     * @param img
+     * @param isHorizontal
+     * @return
+     */
+    public static float[] projectedHistogram(final Mat img, boolean isHorizontal) {
+        int rows=img.rows();
+        int cols=img.cols();
+        float[] nonZeroMat;
+        if(isHorizontal) {//水平
+        	nonZeroMat = new float[rows];
+        }else {//垂直
+        	nonZeroMat = new float[cols];
+        }
+        // 统计这一行或一列中，非零元素的个数，并保存到nonZeroMat中
+        Core.extractChannel(img, img, 0);
+        for (int j = 0; j < nonZeroMat.length; j++) {
+            Mat data = isHorizontal ? img.row(j) : img.col(j);
+            int count = Core.countNonZero(data);
+            nonZeroMat[j] = count;
+        }
+        // Normalize histogram
+        float max = 0;
+        for (int j = 0; j < nonZeroMat.length; ++j) {
+            max = Math.max(max, nonZeroMat[j]);
+        }
+        if (max > 0) {
+            for (int j = 0; j < nonZeroMat.length; ++j) {
+                nonZeroMat[j] /= max;
+            }
+        }
+        return nonZeroMat;
+    }
 }
