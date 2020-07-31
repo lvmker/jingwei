@@ -1,16 +1,26 @@
 package com.bgi.jingwei.util;
 
 
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
+import java.util.Set;
+import java.util.Vector;
 
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.Point;
+import org.opencv.core.Rect;
 import org.opencv.core.RotatedRect;
+import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
+
+import com.bgi.jingwei.entity.ColorEnum;
+import com.bgi.jingwei.entity.exception.BaseException;
 /**
  * 图像处理工作类
  * @author yeyuanchun
@@ -376,4 +386,96 @@ public class MatProcessTools {
         }
         return nonZeroMat;
     }
+    
+    /**
+     * 统一字符的大小
+     * @param in
+     * @return
+     */
+    public static Mat preprocessChar(Mat in) {
+        int h = in.rows();
+        int w = in.cols();
+        Mat transformMat = Mat.eye(2, 3, CvType.CV_32F);
+        int m = Math.max(w, h);
+        transformMat.put(0, 2, (m - w) / 2f);
+        transformMat.put(1, 2, (m - h) / 2f);
+
+        Mat warpImage = new Mat(m, m, in.type());
+        Imgproc.warpAffine(in, warpImage, transformMat, warpImage.size(), Imgproc.INTER_LINEAR, Core.BORDER_CONSTANT, new Scalar(0));
+
+        Mat resized = new Mat(20, 20, CvType.CV_8UC3);
+        Imgproc.resize(warpImage, resized, resized.size(), 0, 0, Imgproc.INTER_CUBIC);
+
+        return resized;
+    }
+    /**
+     * 将Rect按位置从左到右进行排序
+     * @param vecRect
+     * @param out
+     * @return
+     */
+    public static void sortRect(Vector<Rect> vecRect, Vector<Rect> out) {
+        Map<Integer, Integer> map = new HashMap<>();
+        for (int i = 0; i < vecRect.size(); ++i) {
+            map.put(vecRect.get(i).x, i);
+        }
+        Set<Integer> set = map.keySet();
+        Object[] arr = set.toArray();
+        Arrays.sort(arr);
+        for (Object key : arr) {
+            out.add(vecRect.get(map.get(key)));
+        }
+        return;
+    }
+	/**
+	 * 调整字符图像至可分析（20*20）
+	 * @param src
+	 * @return
+	 */
+	public static Mat resizeMat(Mat src) {
+        int height = src.rows();
+		int width = src.cols();
+		boolean isCol=height>width?true:false;//是否补列，原矩形高大于宽，需要增大宽，反之增大高
+		int reacSize=isCol?height:width;//新矩形的宽和高
+		int offset=Math.abs(height-width)/2;//图像偏移值
+		Mat dst=Mat.zeros(reacSize, reacSize, src.type());//目标图像
+		for (int row = 0; row < height; row++) {//图像复制
+			for (int col = 0; col < width; col++) {
+				if(isCol) {
+					dst.put(row, col+offset, src.get(row, col));
+				}else {
+					dst.put(row+offset, col, src.get(row, col));
+				}
+				
+			}
+		}
+		Imgproc.resize(dst, dst, new Size(20, 20));
+		return dst;
+	}
+	
+    /**
+     * 获取图片主体颜色
+     * @param src
+     * @return
+     * @throws BaseException
+     */
+	public static ColorEnum getMatColor(Mat src) throws BaseException {
+        Mat hsv = new Mat();
+        Imgproc.cvtColor(src, hsv, Imgproc.COLOR_BGR2HSV);
+        ColorEnum dstColor = null;
+        int maxNum=-1;
+        for(ColorEnum color:ColorEnum.values()) {
+            Mat mask = new Mat();
+            Core.inRange(hsv, color.lowerb, color.higherb, mask);
+    		Mat binaryImageMat = new Mat();
+    		Imgproc.threshold(mask, binaryImageMat, 127, 255, Imgproc.THRESH_BINARY );
+    		int count=Core.countNonZero(binaryImageMat);
+    		System.out.println(color.desc+"=="+count);
+    		if(count>maxNum) {
+    			dstColor=color;
+    			maxNum=count;
+    		}
+        }
+		return dstColor;
+	}
 }

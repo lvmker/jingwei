@@ -9,25 +9,9 @@ import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.ml.ANN_MLP;
 import org.opencv.ml.Ml;
 import org.opencv.ml.TrainData;
-
 import com.bgi.jingwei.service.train.ANNTrain;
 import com.bgi.jingwei.util.FileUtil;
 import com.bgi.jingwei.util.MatProcessTools;
-/**
- * 基于org.opencv包实现的训练
- * 
- * 图片文字识别训练
- * 训练出来的库文件，用于识别图片中的数字及字母
- * 
- * 测试了一段时间之后，发现把中文独立出来识别，准确率更高一点
- * 
- * 训练的ann.xml应用：
- * 1、替换res/model/ann.xml文件
- * 2、修改com.yuxue.easypr.core.CharsIdentify.charsIdentify(Mat, Boolean, Boolean)方法
- * 
- * @author yuxue
- * @date 2020-05-14 22:16
- */
 public class ANNTrain1 {
 
     private ANN_MLP ann = ANN_MLP.create();

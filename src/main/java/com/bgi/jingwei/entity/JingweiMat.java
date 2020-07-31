@@ -17,6 +17,7 @@ import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
 import com.bgi.jingwei.entity.exception.BaseException;
+import com.bgi.jingwei.util.ImageUI;
 import com.bgi.jingwei.util.MatProcessTools;
 
 public class JingweiMat {
@@ -70,6 +71,15 @@ public class JingweiMat {
 		Mat dst=MatProcessTools.cvtColor(mat, code);
 		return new JingweiMat(dst,"gray");
 	}
+	/**
+	 * 弹窗显示
+	 * @return
+	 */
+	public JingweiMat show() {
+		new ImageUI().imshow(this);
+		return this;
+	}
+	
 	/**
 	 * 水平垂直索贝尔算子融合
 	 * @return
